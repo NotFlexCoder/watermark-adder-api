@@ -16,11 +16,20 @@ app.get('/', async (req, res) => {
     const imageBuffer = Buffer.from(response.data)
 
     if (background) {
+      const image = sharp(imageBuffer)
+      const { data, info } = await image.raw().toBuffer({ resolveWithObject: true })
+      const alpha = Buffer.alloc(info.width * info.height)
+
+      for (let i = 0; i < data.length; i += 3) {
+        const r = data[i]
+        const g = data[i + 1]
+        const b = data[i + 2]
+        alpha[i / 3] = r > 240 && g > 240 && b > 240 ? 0 : 255
+      }
+
       const converted = await sharp(imageBuffer)
         .removeAlpha()
-        .flatten({ background: '#ffffff' })
-        .threshold(240)
-        .ensureAlpha()
+        .joinChannel(alpha, { raw: { width: info.width, height: info.height, channels: 1 } })
         .toFormat('png')
         .toBuffer()
 
