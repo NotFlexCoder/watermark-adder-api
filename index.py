@@ -21,13 +21,13 @@ def watermark():
         image = Image.open(BytesIO(response.content)).convert("RGB")
         draw = ImageDraw.Draw(image)
 
-        font = ImageFont.truetype("arial.ttf", 32)
+        font = ImageFont.load_default()
         width, height = image.size
         text_width, text_height = draw.textsize(text, font)
         x = 10
         y = height - text_height - 10
 
-        draw.text((x, y), text, font=font, fill=(255, 255, 255, 128))
+        draw.text((x, y), text, font=font, fill=(255, 255, 255))
 
         output = BytesIO()
         image.save(output, format="JPEG")
