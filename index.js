@@ -17,28 +17,12 @@ app.get('/', async (req, res) => {
 
     if (background) {
       extension = 'png'
-      const metadata = await sharp(imageBuffer).metadata()
 
-      const maskBuffer = await sharp(imageBuffer)
+      const converted = await sharp(imageBuffer)
         .removeAlpha()
         .flatten({ background: '#ffffff' })
         .threshold(240)
-        .toColourspace('b-w')
-        .toBuffer()
-
-      const converted = await sharp(imageBuffer)
         .ensureAlpha()
-        .composite([
-          {
-            input: maskBuffer,
-            raw: {
-              width: metadata.width,
-              height: metadata.height,
-              channels: 1
-            },
-            blend: 'dest-in'
-          }
-        ])
         .toFormat(extension)
         .toBuffer()
 
