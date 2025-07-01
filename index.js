@@ -13,42 +13,47 @@ app.get('/', async (req, res) => {
 
   try {
     const response = await axios.get(imageUrl, { responseType: 'arraybuffer' })
-    let imageBuffer = Buffer.from(response.data)
-    let image = sharp(imageBuffer)
+    const imageBuffer = Buffer.from(response.data)
 
-    if (background) {
-      image = image
-        .removeAlpha()
-        .flatten({ background: '#ffffff' })
-        .threshold(240)
-        .toColourspace('b-w')
+    if (!background) {
+      const converted = await sharp(imageBuffer)
+        .toFormat(extension)
         .toBuffer()
-        .then(mask =>
-          sharp(imageBuffer)
-            .ensureAlpha()
-            .composite([
-              {
-                input: mask,
-                raw: {
-                  width: (await sharp(imageBuffer).metadata()).width,
-                  height: (await sharp(imageBuffer).metadata()).height,
-                  channels: 1
-                },
-                blend: 'dest-in'
-              }
-            ])
-            .toFormat(extension)
-            .toBuffer()
-        )
-    } else {
-      image = image.toFormat(extension).toBuffer()
+
+      res.setHeader('Content-Type', `image/${extension}`)
+      res.setHeader('Content-Disposition', `attachment; filename=converted.${extension}`)
+      return res.send(converted)
     }
 
-    const converted = await image
+    const metadata = await sharp(imageBuffer).metadata()
+
+    const maskBuffer = await sharp(imageBuffer)
+      .removeAlpha()
+      .flatten({ background: '#ffffff' })
+      .threshold(240)
+      .toColourspace('b-w')
+      .toBuffer()
+
+    const converted = await sharp(imageBuffer)
+      .ensureAlpha()
+      .composite([
+        {
+          input: maskBuffer,
+          raw: {
+            width: metadata.width,
+            height: metadata.height,
+            channels: 1
+          },
+          blend: 'dest-in'
+        }
+      ])
+      .toFormat(extension)
+      .toBuffer()
+
     res.setHeader('Content-Type', `image/${extension}`)
     res.setHeader('Content-Disposition', `attachment; filename=converted.${extension}`)
     res.send(converted)
-  } catch {
+  } catch (err) {
     res.status(500).send('Error processing image')
   }
 })
