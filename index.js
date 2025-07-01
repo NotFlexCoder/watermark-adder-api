@@ -6,28 +6,26 @@ const app = express()
 
 app.get('/', async (req, res) => {
   const imageUrl = req.query.image
-  let extension = req.query.extension
   const background = req.query.background === 'true'
+  const extension = background ? 'png' : req.query.extension
 
-  if (!imageUrl || !extension) return res.status(400).send('Missing parameters')
+  if (!imageUrl || (!background && !extension)) return res.status(400).send('Missing parameters')
 
   try {
     const response = await axios.get(imageUrl, { responseType: 'arraybuffer' })
     const imageBuffer = Buffer.from(response.data)
 
     if (background) {
-      extension = 'png'
-
       const converted = await sharp(imageBuffer)
         .removeAlpha()
         .flatten({ background: '#ffffff' })
         .threshold(240)
         .ensureAlpha()
-        .toFormat(extension)
+        .toFormat('png')
         .toBuffer()
 
-      res.setHeader('Content-Type', `image/${extension}`)
-      res.setHeader('Content-Disposition', `attachment; filename=converted.${extension}`)
+      res.setHeader('Content-Type', 'image/png')
+      res.setHeader('Content-Disposition', 'attachment; filename=converted.png')
       return res.send(converted)
     }
 
@@ -38,7 +36,7 @@ app.get('/', async (req, res) => {
     res.setHeader('Content-Type', `image/${extension}`)
     res.setHeader('Content-Disposition', `attachment; filename=converted.${extension}`)
     res.send(converted)
-  } catch (err) {
+  } catch {
     res.status(500).send('Error processing image')
   }
 })
