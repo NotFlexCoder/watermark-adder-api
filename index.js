@@ -16,17 +16,28 @@ app.get('/', async (req, res) => {
     const imageBuffer = Buffer.from(response.data)
 
     if (background) {
-      const converted = await sharp(imageBuffer)
+      const raw = await sharp(imageBuffer)
+        .resize({ fit: 'contain' })
         .removeAlpha()
         .flatten({ background: '#ffffff' })
-        .threshold(240)
+        .toColourspace('b-w')
+        .threshold(200)
+        .toBuffer()
+
+      const alpha = await sharp(imageBuffer)
+        .resize({ fit: 'contain' })
         .ensureAlpha()
-        .toFormat('png')
+        .extractChannel('alpha')
+        .toBuffer()
+
+      const finalImage = await sharp(raw)
+        .joinChannel(alpha)
+        .png()
         .toBuffer()
 
       res.setHeader('Content-Type', 'image/png')
       res.setHeader('Content-Disposition', 'attachment; filename=converted.png')
-      return res.send(converted)
+      return res.send(finalImage)
     }
 
     const converted = await sharp(imageBuffer)
