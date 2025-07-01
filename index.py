@@ -2,11 +2,8 @@ from flask import Flask, request, send_file
 from PIL import Image, ImageDraw, ImageFont
 import requests
 from io import BytesIO
-import base64
 
 app = Flask(__name__)
-
-FONT_DATA = b'AAEAAAALAIAAAwAwT1MvMg8SCSkAAAC8AAAAYGNtYXAXGzCEAAABHAAAAFRnYXNwAAAAEAAAAXgAAAAIZ2x5ZhTb2jIAAAF4AAACcGhlYWQkEt1nAAADNAAAADZoaGVhB90GzgAAAzgAAAAkaG10eFEAAAAAAAM8AAAAMGxvY2EAZgAEAAADVAAAABRtYXhwAAwABAAA1wAAAAgbmFtZVRYKo0AAANkAAACUnBvc3QDcw3jAAADcAAAACBwcmVwZJoPpLcAAAQMAAAAOQABAAADUv9qAFoEAAAA//8AAgAAAAAAAAABAAADUv9qAFoEAAUAAAAAAAAAAAAAAAAAAAABAAADAAAAAwAAAAAAAAACAAACAAAAHgD+AAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAEAAAABAACAAAACAAAAAwAAABcAAQAAAAAAAwAAAAAAAAAAAAAAAgAAAAIAAAAAAAAAAQAAAAEAAABnAAAAAQAAAAAAZgAAAAEAAAAAAAEAEQAAAAEAAAAAAAIADgAtAAMAAQAAAF0AZQByAHMAaQBvAG4AIAA5AC4AMAAAAAcAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAA=='
 
 @app.route("/")
 def watermark():
@@ -26,23 +23,26 @@ def watermark():
         watermark_layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
         draw = ImageDraw.Draw(watermark_layer)
 
-        font_size = width // 20
-        font_stream = BytesIO(base64.b64decode(FONT_DATA))
-        font = ImageFont.truetype(font_stream, font_size)
+        font = ImageFont.load_default()
+        scale = width // 10
+        factor = scale // 6
+        text_img = Image.new("L", (factor * len(text), factor + 10))
+        text_draw = ImageDraw.Draw(text_img)
+        text_draw.text((0, 0), text, font=font, fill=255)
+        text_img = text_img.resize((width // 2, height // 15))
+        x = (width - text_img.width) // 2
+        y = (height - text_img.height) // 2
 
-        bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        x = (width - text_width) // 2
-        y = (height - text_height) // 2
+        text_colored = Image.new("RGBA", text_img.size, (255, 255, 255, 80))
+        text_colored.putalpha(text_img)
 
-        draw.text((x, y), text, font=font, fill=(255, 255, 255, 90))
-
+        watermark_layer.paste(text_colored, (x, y), text_colored)
         watermarked = Image.alpha_composite(base, watermark_layer)
+
         output = BytesIO()
         watermarked.convert("RGB").save(output, format="JPEG")
         output.seek(0)
-
         return send_file(output, mimetype="image/jpeg")
+
     except Exception as e:
         return str(e), 500
