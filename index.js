@@ -6,7 +6,7 @@ const app = express()
 
 app.get('/', async (req, res) => {
   const imageUrl = req.query.image
-  const extension = req.query.extension
+  let extension = req.query.extension
   const background = req.query.background === 'true'
 
   if (!imageUrl || !extension) return res.status(400).send('Missing parameters')
@@ -15,8 +15,30 @@ app.get('/', async (req, res) => {
     const response = await axios.get(imageUrl, { responseType: 'arraybuffer' })
     const imageBuffer = Buffer.from(response.data)
 
-    if (!background) {
+    if (background) {
+      extension = 'png'
+      const metadata = await sharp(imageBuffer).metadata()
+
+      const maskBuffer = await sharp(imageBuffer)
+        .removeAlpha()
+        .flatten({ background: '#ffffff' })
+        .threshold(240)
+        .toColourspace('b-w')
+        .toBuffer()
+
       const converted = await sharp(imageBuffer)
+        .ensureAlpha()
+        .composite([
+          {
+            input: maskBuffer,
+            raw: {
+              width: metadata.width,
+              height: metadata.height,
+              channels: 1
+            },
+            blend: 'dest-in'
+          }
+        ])
         .toFormat(extension)
         .toBuffer()
 
@@ -25,28 +47,7 @@ app.get('/', async (req, res) => {
       return res.send(converted)
     }
 
-    const metadata = await sharp(imageBuffer).metadata()
-
-    const maskBuffer = await sharp(imageBuffer)
-      .removeAlpha()
-      .flatten({ background: '#ffffff' })
-      .threshold(240)
-      .toColourspace('b-w')
-      .toBuffer()
-
     const converted = await sharp(imageBuffer)
-      .ensureAlpha()
-      .composite([
-        {
-          input: maskBuffer,
-          raw: {
-            width: metadata.width,
-            height: metadata.height,
-            channels: 1
-          },
-          blend: 'dest-in'
-        }
-      ])
       .toFormat(extension)
       .toBuffer()
 
