@@ -1,5 +1,5 @@
-const express = require("express");
-const Jimp = require("jimp");
+import express from "express";
+import Jimp from "jimp";
 
 const app = express();
 
@@ -26,14 +26,12 @@ app.get("/", async (req, res) => {
       50
     );
 
-    image.getBuffer(Jimp.MIME_JPEG, (err, buffer) => {
-      if (err) return res.status(500).send("Error generating image");
-      res.set("Content-Type", Jimp.MIME_JPEG);
-      res.send(buffer);
-    });
+    const buffer = await image.getBufferAsync(Jimp.MIME_JPEG);
+    res.set("Content-Type", Jimp.MIME_JPEG);
+    res.send(buffer);
   } catch (err) {
     res.status(500).send("Invalid image URL or server error");
   }
 });
 
-module.exports = app;
+export default app;
