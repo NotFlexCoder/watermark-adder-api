@@ -1,5 +1,6 @@
 import express from "express";
 import Jimp from "jimp";
+import fetch from "node-fetch";
 
 const app = express();
 
@@ -10,7 +11,11 @@ app.get("/", async (req, res) => {
   if (!imageUrl || !text) return res.status(400).send("Missing image or text");
 
   try {
-    const image = await Jimp.read(imageUrl);
+    const response = await fetch(imageUrl);
+    if (!response.ok) return res.status(400).send("Image not accessible");
+
+    const buffer = await response.buffer();
+    const image = await Jimp.read(buffer);
     const font = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE);
 
     image.print(
@@ -26,11 +31,11 @@ app.get("/", async (req, res) => {
       50
     );
 
-    const buffer = await image.getBufferAsync(Jimp.MIME_JPEG);
+    const result = await image.getBufferAsync(Jimp.MIME_JPEG);
     res.set("Content-Type", Jimp.MIME_JPEG);
-    res.send(buffer);
+    res.send(result);
   } catch (err) {
-    res.status(500).send("Invalid image URL or server error");
+    res.status(500).send("Server error or invalid image");
   }
 });
 
