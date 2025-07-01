@@ -6,47 +6,43 @@ const app = express()
 
 app.get('/', async (req, res) => {
   const imageUrl = req.query.image
-  const background = req.query.background === 'true'
-  const extension = background ? 'png' : req.query.extension
-
-  if (!imageUrl || (!background && !extension)) return res.status(400).send('Missing parameters')
+  if (!imageUrl) return res.status(400).send('Image URL is missing')
 
   try {
     const response = await axios.get(imageUrl, { responseType: 'arraybuffer' })
     const imageBuffer = Buffer.from(response.data)
 
-    if (background) {
-      const raw = await sharp(imageBuffer)
-        .resize({ fit: 'contain' })
-        .removeAlpha()
-        .flatten({ background: '#ffffff' })
-        .toColourspace('b-w')
-        .threshold(200)
-        .toBuffer()
+    const raw = sharp(imageBuffer)
+    const metadata = await raw.metadata()
 
-      const alpha = await sharp(imageBuffer)
-        .resize({ fit: 'contain' })
-        .ensureAlpha()
-        .extractChannel('alpha')
-        .toBuffer()
+    const { data: imageData } = await raw
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true })
 
-      const finalImage = await sharp(raw)
-        .joinChannel(alpha)
-        .png()
-        .toBuffer()
+    const transparentBuffer = Buffer.from(imageData)
 
-      res.setHeader('Content-Type', 'image/png')
-      res.setHeader('Content-Disposition', 'attachment; filename=converted.png')
-      return res.send(finalImage)
+    for (let i = 0; i < transparentBuffer.length; i += 4) {
+      const r = transparentBuffer[i]
+      const g = transparentBuffer[i + 1]
+      const b = transparentBuffer[i + 2]
+
+      if (r > 240 && g > 240 && b > 240) {
+        transparentBuffer[i + 3] = 0
+      }
     }
 
-    const converted = await sharp(imageBuffer)
-      .toFormat(extension)
-      .toBuffer()
+    const result = await sharp(transparentBuffer, {
+      raw: {
+        width: metadata.width,
+        height: metadata.height,
+        channels: 4
+      }
+    }).png().toBuffer()
 
-    res.setHeader('Content-Type', `image/${extension}`)
-    res.setHeader('Content-Disposition', `attachment; filename=converted.${extension}`)
-    res.send(converted)
+    res.setHeader('Content-Type', 'image/png')
+    res.setHeader('Content-Disposition', 'attachment; filename=removed-bg.png')
+    res.send(result)
   } catch {
     res.status(500).send('Error processing image')
   }
