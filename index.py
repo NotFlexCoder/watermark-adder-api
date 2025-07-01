@@ -17,21 +17,25 @@ def watermark():
         response = requests.get(image_url)
         response.raise_for_status()
 
-        image = Image.open(BytesIO(response.content)).convert("RGB")
-        draw = ImageDraw.Draw(image)
+        base = Image.open(BytesIO(response.content)).convert("RGBA")
+        width, height = base.size
+
+        watermark_layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(watermark_layer)
 
         font = ImageFont.load_default()
+        text_width, text_height = draw.textsize(text, font)
 
-        width, height = image.size
-        x = 10
-        y = height - 20
+        x = (width - text_width) // 2
+        y = (height - text_height) // 2
 
-        draw.text((x, y), text, font=font, fill=(255, 255, 255))
+        draw.text((x, y), text, font=font, fill=(255, 255, 255, 80))  # white, light opacity
 
+        watermarked = Image.alpha_composite(base, watermark_layer)
         output = BytesIO()
-        image.save(output, format="JPEG")
+        watermarked.convert("RGB").save(output, format="JPEG")
         output.seek(0)
 
         return send_file(output, mimetype="image/jpeg")
     except Exception as e:
-        return "Server error", 500
+        return str(e), 500
