@@ -17,32 +17,21 @@ def watermark():
         response = requests.get(image_url)
         response.raise_for_status()
 
-        base = Image.open(BytesIO(response.content)).convert("RGBA")
-        width, height = base.size
-
-        watermark_layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
-        draw = ImageDraw.Draw(watermark_layer)
+        image = Image.open(BytesIO(response.content)).convert("RGB")
+        draw = ImageDraw.Draw(image)
 
         font = ImageFont.load_default()
-        scale = width // 10
-        factor = scale // 6
-        text_img = Image.new("L", (factor * len(text), factor + 10))
-        text_draw = ImageDraw.Draw(text_img)
-        text_draw.text((0, 0), text, font=font, fill=255)
-        text_img = text_img.resize((width // 2, height // 15))
-        x = (width - text_img.width) // 2
-        y = (height - text_img.height) // 2
 
-        text_colored = Image.new("RGBA", text_img.size, (255, 255, 255, 80))
-        text_colored.putalpha(text_img)
+        width, height = image.size
+        x = 10
+        y = height - 20
 
-        watermark_layer.paste(text_colored, (x, y), text_colored)
-        watermarked = Image.alpha_composite(base, watermark_layer)
+        draw.text((x, y), text, font=font, fill=(255, 255, 255))
 
         output = BytesIO()
-        watermarked.convert("RGB").save(output, format="JPEG")
+        image.save(output, format="JPEG")
         output.seek(0)
-        return send_file(output, mimetype="image/jpeg")
 
+        return send_file(output, mimetype="image/jpeg")
     except Exception as e:
-        return str(e), 500
+        return "Server error", 500
